@@ -1,46 +1,65 @@
 package ru.maric.licmon.service;
 
-
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ru.maric.licmon.exception.license.LicenseNotFoundException;
 import ru.maric.licmon.exception.license.LicenseParseException;
 import ru.maric.licmon.model.License;
-import ru.maric.licmon.storage.memory.InMemoryLicenseStorage;
 import com._1c.license.activator.crypt.Converter;
 import com._1c.license.activator.data.LicensePermit;
-
+import ru.maric.licmon.storage.ILicenseStorage;
 import java.io.*;
-import java.util.Arrays;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
 public class LicenseService {
 
-    InMemoryLicenseStorage licenseStorage;
-    private static final String WINDOWS_PATH_TO_LOCAL_LICENSES = "C:\\ProgramData\\1C\\licenses";
+    private static final Path WINDOWS_PATH_TO_LOCAL_LICENSES = Paths.get("C:\\ProgramData\\1C\\licenses");
+    private static final Path LINUX_PATH_TO_LOCAL_LICENSES = Paths.get("/var/1c/licenses");
 
-    @Autowired
-    public LicenseService(InMemoryLicenseStorage licenseStorage) {
+    private final ILicenseStorage licenseStorage;
+
+    public LicenseService(ILicenseStorage licenseStorage) {
         this.licenseStorage = licenseStorage;
+        parseAllLicenses();
     }
 
     public List<License> getAll() {
         log.debug("Выполнен запрос всех лицензий");
-        List<License> licenses = Arrays.stream(new File(WINDOWS_PATH_TO_LOCAL_LICENSES).listFiles())
-                .filter(file -> !file.isDirectory())
-                .map(this::readLicenseFromServer)
-                .collect(Collectors.toList());
-        log.debug("Получен список из {} лицензий", licenses.size());
-        log.trace("Перечень: {}", licenses.stream().map(License::getSerial).toString());
-        return licenses;
+        return licenseStorage.getAll();
     }
 
-    public License getById(Integer id) {
-        log.debug("Выполнен запрос лицензии с id = {}", id);
-        return null;
+    public License getById(String serial) {
+        log.debug("Выполнен запрос лицензии с серийным номером = {}", serial);
+        return licenseStorage.getBySerial(serial).orElseThrow(() -> new LicenseNotFoundException(serial));
+    }
+
+    private void parseAllLicenses() {
+        try (Stream<Path> files = Files.walk(getDefaultLicenseStorage(), 1)) {
+            files.filter(path -> !Files.isDirectory(path))
+                .map(Path::toFile)
+                .forEach(lic -> licenseStorage.save(readLicenseFromServer(lic)));
+        } catch (IOException e) {
+            throw new LicenseParseException("Ошибка при парсинге лицензий: " + e.getMessage());
+        }
+        log.debug("Сохранены данные {} лицензий", licenseStorage.getSize());
+    }
+
+    private Path getDefaultLicenseStorage() {
+        String os = System.getProperty("os.name").toLowerCase();
+
+        if (os.contains("win")) {
+            return WINDOWS_PATH_TO_LOCAL_LICENSES;
+        } else if (os.contains("nix")) {
+            return LINUX_PATH_TO_LOCAL_LICENSES;
+        } else {
+            throw new LicenseParseException("Определение лицензий возможно только на ОС семейств Windows и Linux");
+        }
     }
 
     private License readLicenseFromServer(File file) {

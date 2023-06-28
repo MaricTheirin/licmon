@@ -2,8 +2,17 @@ package ru.maric.licmon.exception.license;
 
 import org.springframework.http.HttpStatus;
 
-public interface LicmonException {
+public abstract class LicmonException extends RuntimeException {
 
-    HttpStatus getReturnCode();
+    private final HttpStatus status;
+
+    public LicmonException(String message, HttpStatus status) {
+        super(message);
+        this.status = status;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
 
 }
