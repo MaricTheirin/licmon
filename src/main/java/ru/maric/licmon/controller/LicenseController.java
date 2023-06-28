@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.maric.licmon.model.License;
 import ru.maric.licmon.service.LicenseService;
-
 import java.util.List;
 
 @Slf4j
@@ -16,7 +15,7 @@ import java.util.List;
 @RequestMapping("/licenses")
 public class LicenseController {
 
-    LicenseService licenseService;
+    private final LicenseService licenseService;
 
     @Autowired
     public LicenseController(LicenseService licenseService) {
@@ -29,7 +28,7 @@ public class LicenseController {
     }
 
     @GetMapping("/{id}")
-    public License getLicenseById(@PathVariable Integer id) {
+    public License getLicenseById(@PathVariable String id) {
         return licenseService.getById(id);
     }
 
