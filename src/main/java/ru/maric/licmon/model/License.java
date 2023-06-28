@@ -4,7 +4,6 @@ import com._1c.license.activator.data.CustomerInfo;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
 import java.util.Date;
 
 @Data
